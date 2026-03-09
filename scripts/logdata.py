@@ -238,8 +238,11 @@ def process_typedef(item, items, tdenums):
             break
         elif c.tag == "const_type":
             break
+        elif c.tag == "class_type":
+            break
         else:
             print("Unknown typedef child", c.tag)
+            break
     if len(mapping) > 0:
         # print(name, mapping)
         tdenums[name] = mapping
@@ -291,6 +294,7 @@ def extract(root, items):
                 "class_type",
                 "imported_module",
                 "ptr_to_member_type",
+                "imported_declaration",
             ]:
                 pass
             else:
