@@ -11,7 +11,7 @@ function(zephyr_log_tasks)
   if(CONFIG_UC_SIGNED_IMAGE)
     set(extra_cache_args)
   else()
-    set(extra_cache_args -f)
+    set(extra_cache_args -f --hashfile ${output}.hash)
   endif()
 
   # CMake guarantees that multiple COMMANDs given to
