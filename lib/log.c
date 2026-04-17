@@ -19,7 +19,12 @@
 
 #include "log.h"
 #include "cobs.h"
+#include "cbor.h"
 #include "cb.h"
+
+#ifdef CONFIG_APP_VERSION
+#include "app_version.h"
+#endif
 
 #if CONFIG_UC_LOG_SAVE
 #define NOCLEAR __noinit
@@ -30,6 +35,8 @@
 #if !defined(CONFIG_UC_LOG_MAX_PACKET_SIZE)
 #define CONFIG_UC_LOG_MAX_PACKET_SIZE (1500)
 #endif
+
+#define DEVICE_INFO_UCLOG_PORT (62)
 
 typedef struct {
   const uart_t* uart;
@@ -44,6 +51,10 @@ static log_data_t log_data;
 
 static NOCLEAR cb_t    tx_cb;
 static NOCLEAR uint8_t tx_buf[CONFIG_UC_LOG_BUF_SIZE];
+
+#define MAX_DEVICE_INFO_SIZE 256
+static uint8_t device_info_tx_buf[COBS_ENC_SIZE(MAX_DEVICE_INFO_SIZE) + 2];
+static size_t device_info_len = 0;
 
 static size_t strnlen_s (const char* s, size_t n) {
   const char* found = memchr(s, '\0', n);
@@ -176,19 +187,57 @@ void log_tx_suspend(void) {
   log_data.tx_enabled = false;
 }
 
+#ifdef CONFIG_APP_VERSION
+static void fill_device_info(void)
+{
+    size_t port_offset = sizeof(device_info_tx_buf) - (size_t)MAX_DEVICE_INFO_SIZE;
+
+    // Encode port number
+    uint8_t port = DEVICE_INFO_UCLOG_PORT;
+    device_info_tx_buf[port_offset] = (port << 2) | 3;
+
+    // Encode CBOR
+    size_t cbor_offset = port_offset + 1;
+    uint8_t *cbor_output = &device_info_tx_buf[cbor_offset];
+
+    cbor_stream_t cbor_stream;
+    cbor_init(&cbor_stream, cbor_output, MAX_DEVICE_INFO_SIZE);
+
+#ifdef CONFIG_SIGNED_IMAGE
+    const uint8_t *app_hash__ = sbl_app_hash();
+#endif
+
+    cbor_error_t err = cbor_pack(&cbor_stream,
+            "{"
+            ".app_hash:b,"
+            ".image_type:s,"
+            ".board:s"
+            "}",
+            log_app_hash(NULL), LOG_APP_HASH_SIZE,
+            get_image_type(),
+            CONFIG_BOARD);
+    if (err != CBOR_ERROR_NONE) {
+        LOG_FATAL("CBOR pack error: {enum:cbor_error_t}%d", err);
+    }
+
+    size_t cbor_len = cbor_read_avail(&cbor_stream);
+
+    // Encode COBS
+    size_t cobs_len = cobs_enc(&device_info_tx_buf[1], &device_info_tx_buf[port_offset],
+            cbor_len + 1);
+
+    // Frame
+    device_info_tx_buf[0] = '\0';
+    device_info_tx_buf[cobs_len + 1] = '\0';
+
+    device_info_len = cobs_len + 2;
+}
+#endif
 
 void log_tx_resume(void) {
   log_data.tx_enabled = true;
-  static uint8_t b[1+LOG_APP_HASH_SIZE+1+2];
 
-  // A app hash on each resume to identify the device
-  // so that the correct uclog decoder file can be loaded
-  b[2] = (63 << 2) | 3;
-  memmove(b + 3, log_app_hash(NULL), LOG_APP_HASH_SIZE);
-  size_t n = cobs_enc(b + 1, b + 2, LOG_APP_HASH_SIZE + 1);
-  b[0] = '\0';
-  b[n+1] = '\0';
-  ucuart_tx_schedule(log_data.uart, b, n+2);
+  ucuart_tx_schedule(log_data.uart, device_info_tx_buf, device_info_len);
 }
 
 int log_is_host_ready(bool *host_ready) {
@@ -327,6 +376,10 @@ void log_pre_init(void) {
 
 void log_init(uart_t* uart) {
   if (uart == NULL) return;
+
+#ifdef CONFIG_APP_VERSION
+  fill_device_info();
+#endif
 
   log_data.uart = uart;
   ucuart_set_tx_cb(log_data.uart, &tx_cb);
