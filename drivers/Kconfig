@@ -3,5 +3,6 @@
 
 menu "UC Drivers"
 rsource "ucuart/Kconfig"
+rsource "ucuart_z/Kconfig"
 rsource "ucusb/Kconfig"
 endmenu
