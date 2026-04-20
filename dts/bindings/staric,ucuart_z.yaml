@@ -1,0 +1,22 @@
+description: |
+  ucLogger UART - Zephyr
+
+  This is the binding for the UART driver using Zephyr UART API.
+  This driver protocol matches needs of Unit Circle Logging Framwork.
+
+compatible: "staric,ucuart_z"
+
+include: [uart-device.yaml]
+
+properties:
+  wakeup-gpios:
+    type: phandle-array
+    description: |
+      The wakeup gpio
+
+  current-speed:
+    required: true
+    description: |
+      Initial baud rate setting for UART. Only a fixed set of baud
+      rates are selectable on these devices.
+    type: int

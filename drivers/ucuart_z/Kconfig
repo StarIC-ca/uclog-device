@@ -1,0 +1,31 @@
+# © 2026 StarIC Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+config UCUART_Z
+	bool "ucLog UART (Zephyr API)"
+	default y
+	depends on DT_HAS_STARIC_UCUART_Z_ENABLED
+	select UART
+	select SERIAL
+	select UART_ASYNC_API if SERIAL_SUPPORT_ASYNC
+	select UART_INTERRUPT_DRIVEN if SERIAL_SUPPORT_INTERRUPT
+	select UART_USE_RUNTIME_CONFIGURE
+	help
+	  ucLog UART using Zephyr API
+
+if UCUART_Z
+
+module = UCUART_Z
+module-str = ucuart_Z
+source "subsys/logging/Kconfig.template.log_config"
+
+config UCUART_Z_INIT_PRIORITY
+	int "ucuart_Z init priority"
+	default 90 # KERNEL_INIT_PRIORITY_DEVICE
+	help
+	  ucLog UART initialization priority.
+
+# Can include specific alternatives here e.g.
+# rsource Kconfig.xxx
+
+endif
