@@ -233,13 +233,21 @@ static void fill_device_info(void)
 #endif
 
 void log_tx_resume(void) {
-  log_data.tx_enabled = true;
-
-  ucuart_tx_schedule(log_data.uart, device_info_tx_buf, device_info_len);
+  if (log_data.uart != NULL) {
+    log_data.tx_enabled = true;
+    ucuart_tx_schedule(log_data.uart, device_info_tx_buf, device_info_len);
+  } else {
+    LOG_ERROR("UART device not set!");
+  }
 }
 
 int log_is_host_ready(bool *host_ready) {
-  return ucuart_is_host_ready(log_data.uart, host_ready);
+  if (log_data.uart != NULL) {
+    return ucuart_is_host_ready(log_data.uart, host_ready);
+  } else {
+    *host_ready = false;
+    return -ENODEV;
+  }
 }
 
 // Allow others to override log_fatal if needed

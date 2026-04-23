@@ -288,5 +288,5 @@ static int z_log_server_init(void) {
 #endif
   return 0;
 }
-SYS_INIT(z_log_server_init, APPLICATION, 0);
+SYS_INIT(z_log_server_init, APPLICATION, 20);
 #endif
