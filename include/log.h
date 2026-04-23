@@ -36,6 +36,13 @@ extern "C" {
 #define LOG_MAX_PACKET_SIZE (1500)
 #endif
 
+// ports for ucLog infrastructure
+#define LOG_PORT_PLOTTING 60
+#define LOG_PORT_SHELL 61
+#define LOG_PORT_DEVICE_INFO 62
+#define LOG_PORT_SYSCALLS 63
+#define LOG_MAX_PORTS 64
+#define NUM_INTERNAL_LOG_PORTS (LOG_MAX_PORTS - LOG_PORT_PLOTTING)
 
 // Override/overload zephyr logging macros
 #if defined(CONFIG_LOG_CUSTOM_HEADER)

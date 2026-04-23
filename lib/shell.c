@@ -4,6 +4,10 @@
 #include <zephyr/shell/shell.h>
 #include <zephyr/init.h>
 #include "cb.h"
+#include "log.h"
+
+// Specific notify for shell, not in public log.h
+extern void log_notify_shell(log_cb_t* task, void* ctx);
 
 struct shell_uc_ctrl_blk {
   shell_transport_handler_t handler;
@@ -38,7 +42,6 @@ extern const struct shell_transport_api transport_api;
 
 #define CONFIG_UC_SHELL_BACKEND_SERIAL_RX_BUF_SIZE (256)
 #define CONFIG_UC_SHELL_BACKEND_INIT_PRIORITY 10
-#define CONFIG_UC_SHELL_BACKEND_PORT 0
 
 SHELL_UC_DEFINE(shell_transport_uc,
       CONFIG_UC_SHELL_BACKEND_SERIAL_RX_BUF_SIZE);
@@ -73,13 +76,13 @@ static int init(const struct shell_transport *transport,
   sh->ctrl_blk->handler = evt_handler;
   sh->ctrl_blk->context = context;
 
-  log_notify(CONFIG_UC_SHELL_BACKEND_PORT, log_handle, (void*) sh);
+  log_notify_shell(log_handle, (void*) sh);
   return 0;
 }
 
 static int uninit(const struct shell_transport *transport) {
   (void) transport;
-  log_notify(0, NULL, NULL);
+  log_notify_shell(NULL, NULL);
   return 0;
 }
 
@@ -106,7 +109,7 @@ static int write(const struct shell_transport *transport,
     size_t n = cb_peek_avail(sh->tx_cb);
     if (n == 0) break;
     //LOG_MEM_INFO("sh:", cb_peek(sh->tx_cb), n);
-    log_tx(CONFIG_UC_SHELL_BACKEND_PORT, cb_peek(sh->tx_cb), n);
+    log_tx(LOG_PORT_SHELL, cb_peek(sh->tx_cb), n);
     cb_skip(sh->tx_cb, n);
   }
   cb_write(sh->tx_cb, data, length);
@@ -121,7 +124,7 @@ static int write(const struct shell_transport *transport,
       size_t n = cb_peek_avail(sh->tx_cb);
       if (n == 0) break;
       //LOG_MEM_INFO("sh:", cb_peek(sh->tx_cb), n);
-      log_tx(CONFIG_UC_SHELL_BACKEND_PORT, cb_peek(sh->tx_cb), n);
+      log_tx(LOG_PORT_SHELL, cb_peek(sh->tx_cb), n);
       cb_skip(sh->tx_cb, n);
     }
   }

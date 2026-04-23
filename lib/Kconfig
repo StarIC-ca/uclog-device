@@ -35,6 +35,8 @@ if UC_LOG_SERVER
 config UC_LOG_SERVER_PORTS
         int "UC log server input ports"
         default 8
+        help
+          "These ports are for application usage"
 
 config UC_LOG_STACK_SIZE
         int "UC log thread stack size"

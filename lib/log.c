@@ -36,8 +36,6 @@
 #define CONFIG_UC_LOG_MAX_PACKET_SIZE (1500)
 #endif
 
-#define DEVICE_INFO_UCLOG_PORT (62)
-
 typedef struct {
   const uart_t* uart;
   bool    tx_enabled;
@@ -193,7 +191,7 @@ static void fill_device_info(void)
     size_t port_offset = sizeof(device_info_tx_buf) - (size_t)MAX_DEVICE_INFO_SIZE;
 
     // Encode port number
-    uint8_t port = DEVICE_INFO_UCLOG_PORT;
+    uint8_t port = LOG_PORT_DEVICE_INFO;
     device_info_tx_buf[port_offset] = (port << 2) | 3;
 
     // Encode CBOR
@@ -269,7 +267,7 @@ void log_tx(uint8_t port, const uint8_t* data, size_t n) {
   static uint8_t b[COBS_ENC_SIZE(LOG_MAX_PACKET_SIZE+1)+2];
 
   if (n > LOG_MAX_PACKET_SIZE) LOG_FATAL("tx message too long %zu", n);
-  if (63 < port) LOG_FATAL("invalid port %d", port);
+  if (port >= LOG_MAX_PORTS) LOG_FATAL("invalid port %d", port);
   b[sizeof(b)-(LOG_MAX_PACKET_SIZE+1)] = (port << 2) | 3;
   memmove(b+sizeof(b)-LOG_MAX_PACKET_SIZE, data, n);
   n = cobs_enc(b+1, b+sizeof(b)-(LOG_MAX_PACKET_SIZE+1), n + 1);

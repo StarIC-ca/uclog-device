@@ -48,6 +48,8 @@ typedef struct {
 #if CONFIG_UC_LOG_SERVER_PORTS> 0
   log_cb_t* handlers[CONFIG_UC_LOG_SERVER_PORTS];
   void*     contexts[CONFIG_UC_LOG_SERVER_PORTS];
+  log_cb_t* shell_handler;
+  void*     shell_context;
   uint8_t port;
   uint8_t  rx_port;
   bool     rx_avail;
@@ -64,7 +66,7 @@ typedef struct {
 static log_server_data_t server;
 
 size_t log_rx(uint8_t port, uint8_t* data, size_t n) {
-  if (port >= 64) LOG_FATAL("Invalid port %d", port);
+  if (port >= LOG_MAX_PORTS) LOG_FATAL("Invalid port %d", port);
   if (server.rx_port != 255) LOG_FATAL("Trying to call log_rx from another thread");
   server.rx_data = data;
   server.rx_n = n;
@@ -93,6 +95,11 @@ void log_notify(uint8_t port, log_cb_t* task, void* ctx) {
   }
   server.handlers[port] = task;
   server.contexts[port] = ctx;
+}
+
+void log_notify_shell(log_cb_t* task, void* ctx) {
+  server.shell_handler = task;
+  server.shell_context = ctx;
 }
 
 static void log_thread(log_server_data_t* data) {
@@ -198,7 +205,7 @@ pause:
           if (type != 0x3) {
             LOG_ERROR("unexpected frame type: %d", type);
           }
-          else if ((data->rx_port < 64) && (data->port == data->rx_port)) {
+          else if ((data->rx_port < LOG_MAX_PORTS) && (data->port == data->rx_port)) {
             size_t nn = n - 1;
             if (nn > data->rx_n) {
               nn = data->rx_n;
@@ -212,6 +219,9 @@ pause:
 #else
             // Non-zephyr way to post an event
 #endif
+          }
+          else if (data->port == LOG_PORT_SHELL && data->shell_handler) {
+            data->shell_handler(data->buf + 1, n - 1, data->shell_context);
           }
           else if (data->port >= CONFIG_UC_LOG_SERVER_PORTS) {
             LOG_ERROR("invalid port: %d", data->port);
