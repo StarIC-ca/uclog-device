@@ -47,11 +47,17 @@ static log_data_t log_data;
 #define CONFIG_UC_LOG_BUF_SIZE (4096*2)
 #endif
 
+#if defined(CONFIG_UCUART_Z) && defined(CONFIG_SOC_FAMILY_STM32) && defined(CONFIG_NOCACHE_MEMORY)
+#define NOCACHE_ATTR __nocache
+#else
+#define NOCACHE_ATTR
+#endif
+
 static NOCLEAR cb_t    tx_cb;
-static NOCLEAR uint8_t tx_buf[CONFIG_UC_LOG_BUF_SIZE];
+static NOCLEAR uint8_t tx_buf[CONFIG_UC_LOG_BUF_SIZE] NOCACHE_ATTR;
 
 #define MAX_DEVICE_INFO_SIZE 256
-static uint8_t device_info_tx_buf[COBS_ENC_SIZE(MAX_DEVICE_INFO_SIZE) + 2];
+static uint8_t device_info_tx_buf[COBS_ENC_SIZE(MAX_DEVICE_INFO_SIZE) + 2] NOCACHE_ATTR;
 static size_t device_info_len = 0;
 
 static size_t strnlen_s (const char* s, size_t n) {

@@ -44,7 +44,7 @@ struct ucuart_data {
     atomic_t host_ready;
     cb_t *tx_cb;
 #ifdef CONFIG_UART_ASYNC_API
-    uint8_t rx_temp_buf[NUM_RX_BUFS][RX_TEMP_BUF_LEN];
+    uint8_t *rx_temp_buf;
     size_t rx_temp_buf_index;
 #endif
     uint8_t prefix_buf[RX_TEMP_BUF_LEN];
@@ -82,7 +82,12 @@ static void uart_event_handler(const struct device *dev, struct uart_event *evt,
     const struct ucuart_config *config = ZEPHYR_DEVICE_MEMBER(data->dev, config);
     switch (evt->type) {
     case UART_TX_DONE: {
-        cb_skip(data->tx_cb, evt->data.tx.len);
+        if (data->prefix_len > data->prefix_index) {
+            // prefix was sent
+            data->prefix_index = data->prefix_len;
+        } else {
+            cb_skip(data->tx_cb, evt->data.tx.len);
+        }
 
         // If there is more data then send it now
         size_t n = cb_peek_avail(data->tx_cb);
@@ -120,9 +125,9 @@ static void uart_event_handler(const struct device *dev, struct uart_event *evt,
         break;
     }
     case UART_RX_BUF_REQUEST:
-        data->rx_temp_buf_index++;
-        data->rx_temp_buf_index %= NUM_RX_BUFS;
-        uart_rx_buf_rsp(dev, data->rx_temp_buf[data->rx_temp_buf_index], RX_TEMP_BUF_LEN);
+        data->rx_temp_buf_index += RX_TEMP_BUF_LEN;
+        data->rx_temp_buf_index %= (NUM_RX_BUFS * RX_TEMP_BUF_LEN);
+        uart_rx_buf_rsp(dev, &data->rx_temp_buf[data->rx_temp_buf_index], RX_TEMP_BUF_LEN);
         break;
     case UART_RX_BUF_RELEASED:
         break;
@@ -216,6 +221,8 @@ static int tx_schedule(const struct device *dev, const uint8_t* prefix, size_t p
             size_t n = cb_peek_avail(data->tx_cb);
 #if defined(CONFIG_UART_ASYNC_API)
             if ((prefix != NULL) && (pn > 0)) {
+                data->prefix_index = 0;
+                data->prefix_len = pn;
                 int ret = uart_tx(config->uart, prefix, pn, SYS_FOREVER_US);
                 if (ret != 0) {
                     LOG_ERROR("uart_tx() failed, ret %d", ret);
@@ -405,7 +412,7 @@ static int ucuart_enable(const struct device *dev)
 
     // Restart rx/tx tasks
 #if defined(CONFIG_UART_ASYNC_API)
-    int ret = uart_rx_enable(config->uart, data->rx_temp_buf[data->rx_temp_buf_index], RX_TEMP_BUF_LEN, UART_ASYNC_RX_TIMEOUT_US);
+    int ret = uart_rx_enable(config->uart, &data->rx_temp_buf[data->rx_temp_buf_index], RX_TEMP_BUF_LEN, UART_ASYNC_RX_TIMEOUT_US);
     if (ret != 0) {
         LOG_ERROR("uart_rx_enable() failed, ret %d", ret);
         return -EIO;
@@ -564,10 +571,20 @@ static int ucuart_init(const struct device *dev)
     return 0;
 }
 
-#ifdef CONFIG_UART_ASYNC_API
-#define UART_ASYNC_DATA_INIT()      \
-    .rx_temp_buf_index = 0U,
+#if defined(CONFIG_SOC_FAMILY_STM32) && defined(CONFIG_NOCACHE_MEMORY)
+#define NOCACHE_ATTR __nocache
 #else
+#define NOCACHE_ATTR
+#endif
+
+#ifdef CONFIG_UART_ASYNC_API
+#define UART_TEMP_BUF_INIT()                \
+    static uint8_t ucuart_rx_temp_buf##i[NUM_RX_BUFS * RX_TEMP_BUF_LEN] NOCACHE_ATTR
+#define UART_ASYNC_DATA_INIT()              \
+    .rx_temp_buf_index = 0U,                \
+    .rx_temp_buf = ucuart_rx_temp_buf##i,
+#else
+#define UART_TEMP_BUF_INIT() /* Not used */
 #define UART_ASYNC_DATA_INIT() /* Not used */
 #endif
 
@@ -576,6 +593,8 @@ static int ucuart_init(const struct device *dev)
                                                                                                    \
     static uint8_t ucuart_rx_buf##i[RX_CB_BUF_LEN];                                                \
     static cb_t ucuart_rx_cb##i = CB_INIT(ucuart_rx_buf##i);                                       \
+                                                                                                   \
+    UART_TEMP_BUF_INIT();                                                                          \
                                                                                                    \
     static const struct ucuart_config config##i = {                                                \
         .uart = DEVICE_DT_GET(DT_INST_BUS(i)),                                                     \
