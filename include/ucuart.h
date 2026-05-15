@@ -18,7 +18,8 @@ extern "C" {
 
 typedef int (*ucuart_tx_no_wait_t)(const struct device *dev, const uint8_t* b, size_t n);
 typedef int (*ucuart_tx_buffer_t)(const struct device *dev, const uint8_t* b, size_t n);
-typedef int (*ucuart_tx_schedule_t)(const struct device *dev, const uint8_t* prefix, size_t pn);
+typedef int (*ucuart_tx_schedule_t)(const struct device *dev);
+typedef int (*ucuart_set_connect_prefix_t)(const struct device *dev, const uint8_t* prefix, size_t pn);
 typedef int (*ucuart_set_tx_cb_t)(const struct device *dev, cb_t* cb);
 
 
@@ -49,6 +50,7 @@ __subsystem struct ucuart_driver_api {
   ucuart_tx_no_wait_t tx_no_wait;
   ucuart_tx_buffer_t tx_buffer;
   ucuart_tx_schedule_t tx_schedule;
+  ucuart_set_connect_prefix_t set_connect_prefix;
   ucuart_set_tx_cb_t set_tx_cb;
 
   ucuart_rx_start_t rx_start;
@@ -71,19 +73,36 @@ __subsystem struct ucuart_driver_api {
  * @brief Send any buffered data.
  *
  * @param dev UcUart device instance.
+ *
+ * @retval 0 On success.
+ * @retval -errno Other negative errno in case of failure.
+ */
+__syscall int ucuart_tx_schedule(const struct device *dev);
+
+static inline int z_impl_ucuart_tx_schedule(const struct device *dev) {
+  const struct ucuart_driver_api *api =
+      (const struct ucuart_driver_api *)ZEPHYR_DEVICE_MEMBER(dev, api);
+
+  return api->tx_schedule(dev);
+}
+
+/**
+ * @brief Set prefix to send first on new connection.
+ *
+ * @param dev UcUart device instance.
  * @param prefix Buffer of bytes to send before sending data in the circ buffer
  * @param pn Length of prefix buffer.
  *
  * @retval 0 On success.
  * @retval -errno Other negative errno in case of failure.
  */
-__syscall int ucuart_tx_schedule(const struct device *dev, const uint8_t* prefix, size_t pn);
+__syscall int ucuart_set_connect_prefix(const struct device *dev, const uint8_t* prefix, size_t pn);
 
-static inline int z_impl_ucuart_tx_schedule(const struct device *dev, const uint8_t* prefix, size_t pn) {
+static inline int z_impl_ucuart_set_connect_prefix(const struct device *dev, const uint8_t* prefix, size_t pn) {
   const struct ucuart_driver_api *api =
       (const struct ucuart_driver_api *)ZEPHYR_DEVICE_MEMBER(dev, api);
 
-  return api->tx_schedule(dev, prefix, pn);
+  return api->set_connect_prefix(dev, prefix, pn);
 }
 
 /**

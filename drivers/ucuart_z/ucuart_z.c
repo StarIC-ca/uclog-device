@@ -208,7 +208,7 @@ static void uart_isr(const struct device *uart_dev, void *user_data)
 }
 #endif
 
-static int tx_schedule(const struct device *dev, const uint8_t* prefix, size_t pn)
+static int tx_schedule(const struct device *dev)
 {
     const struct ucuart_config *config = ZEPHYR_DEVICE_MEMBER(dev, config);
     struct ucuart_data *data = ZEPHYR_DEVICE_MEMBER(dev, data);
@@ -220,10 +220,10 @@ static int tx_schedule(const struct device *dev, const uint8_t* prefix, size_t p
         if (got) {
             size_t n = cb_peek_avail(data->tx_cb);
 #if defined(CONFIG_UART_ASYNC_API)
-            if ((prefix != NULL) && (pn > 0)) {
-                data->prefix_index = 0;
-                data->prefix_len = pn;
-                int ret = uart_tx(config->uart, prefix, pn, SYS_FOREVER_US);
+            if (data->prefix_len > data->prefix_index) {
+                // Send prefix first
+                n = data->prefix_len - data->prefix_index;
+                int ret = uart_tx(config->uart, &data->prefix_buf[data->prefix_index], n, SYS_FOREVER_US);
                 if (ret != 0) {
                     LOG_ERROR("uart_tx() failed, ret %d", ret);
                     atomic_set(&data->tx_active, false);
@@ -238,18 +238,7 @@ static int tx_schedule(const struct device *dev, const uint8_t* prefix, size_t p
                 atomic_set(&data->tx_active, false);
             }
 #else
-            if ((prefix != NULL) && (pn > 0)) {
-                if (pn > sizeof(data->prefix_buf)) {
-                    LOG_ERROR("Prefix too long: %zu", pn);
-                    atomic_set(&data->tx_active, false);
-                    return -EINVAL;
-                } else {
-                    memcpy(data->prefix_buf, prefix, pn);
-                    data->prefix_index = 0;
-                    data->prefix_len = pn;
-                    uart_irq_tx_enable(config->uart);
-                }
-            } else if (n > 0) {
+            if ((data->prefix_len > data->prefix_index) || (n > 0)) {
                 // Just enable TX. Writing into FIFO is done in ISR.
                 uart_irq_tx_enable(config->uart);
             } else {
@@ -257,7 +246,31 @@ static int tx_schedule(const struct device *dev, const uint8_t* prefix, size_t p
             }
 #endif
         }
+        return 0;
+    } else {
+        return -ENOTCONN;
     }
+}
+
+static int set_connect_prefix(const struct device *dev, const uint8_t *prefix, size_t pn)
+{
+    struct ucuart_data *data = ZEPHYR_DEVICE_MEMBER(dev, data);
+
+    if ((prefix != NULL) && (pn > 0)) {
+        if (pn > sizeof(data->prefix_buf)) {
+            LOG_ERROR("Prefix too long: %zu", pn);
+            data->prefix_index = 0;
+            data->prefix_len = 0;
+        } else {
+            memcpy(data->prefix_buf, prefix, pn);
+            data->prefix_index = 0;
+            data->prefix_len = pn;
+        }
+    } else {
+        data->prefix_index = 0;
+        data->prefix_len = 0;
+    }
+
     return 0;
 }
 
@@ -272,7 +285,7 @@ static int tx(const struct device *dev, const uint8_t *b, size_t n)
     }
 
     cb_write(data->tx_cb, b, n);
-    return tx_schedule(dev, NULL, 0);
+    return tx_schedule(dev);
 }
 
 static int tx_buffer(const struct device *dev, const uint8_t *b, size_t n)
@@ -352,6 +365,7 @@ static const struct ucuart_driver_api ucuart_api = {
     .tx_no_wait = tx,
     .tx_buffer = tx_buffer,
     .tx_schedule = tx_schedule,
+    .set_connect_prefix = set_connect_prefix,
     .set_tx_cb = set_tx_cb,
     .rx_start = rx_start,
     .rx_stop = rx_stop,
@@ -362,10 +376,11 @@ static const struct ucuart_driver_api ucuart_api = {
     .panic = panic,
 };
 
-void ping_timeout(struct k_timer *timer)
+static void ping_timeout(struct k_timer *timer)
 {
     struct ucuart_data *data = CONTAINER_OF(timer, struct ucuart_data, ping_timeout_timer);
     atomic_set(&data->host_ready, false);
+    data->prefix_index = 0;
     LOG_WARN("Ping timeout expired: Host disconnected");
 
 #ifdef CONFIG_PM_DEVICE_RUNTIME
@@ -441,6 +456,7 @@ static int rx_abort(const struct device *dev)
         cb_reset(config->rx_cb);
         atomic_set(&data->host_ready, false);
         atomic_set(&data->tx_active, false);
+        data->prefix_index = 0;
 #ifdef CONFIG_UART_ASYNC_API
         data->rx_temp_buf_index = 0;
 #endif

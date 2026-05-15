@@ -87,7 +87,7 @@ void log_log1_(const char *prefix) {
   b[0] = 0x00;
   b[1+n] = 0x00;
   tx_buffer(b, n+2);
-  if (log_data.tx_enabled) ucuart_tx_schedule(log_data.uart, NULL, 0);
+  if (log_data.tx_enabled) ucuart_tx_schedule(log_data.uart);
 }
 
 void log_logn_(const char* fmt, const char *prefix,  ...) {
@@ -162,7 +162,7 @@ done:
   b[0] = 0x00;
   b[1+n] = 0x00;
   tx_buffer(b, n+2);
-  if (log_data.tx_enabled) ucuart_tx_schedule(log_data.uart, NULL, 0);
+  if (log_data.tx_enabled) ucuart_tx_schedule(log_data.uart);
 }
 
 void log_mem_(const char *prefix, const void* b, size_t n) {
@@ -184,7 +184,7 @@ void log_mem_(const char *prefix, const void* b, size_t n) {
   bb[0] = 0x00;
   bb[1+n] = 0x00;
   tx_buffer(bb, n+2);
-  if (log_data.tx_enabled) ucuart_tx_schedule(log_data.uart, NULL, 0);
+  if (log_data.tx_enabled) ucuart_tx_schedule(log_data.uart);
 }
 
 void log_tx_suspend(void) {
@@ -241,7 +241,7 @@ static void fill_device_info(void)
 void log_tx_resume(void) {
   if (log_data.uart != NULL) {
     log_data.tx_enabled = true;
-    ucuart_tx_schedule(log_data.uart, device_info_tx_buf, device_info_len);
+    ucuart_tx_schedule(log_data.uart);
   } else {
     LOG_ERROR("UART device not set!");
   }
@@ -288,7 +288,7 @@ void log_tx(uint8_t port, const uint8_t* data, size_t n) {
   b[0] = '\0';
   b[n+1] = '\0';
   tx_buffer(b, n+2);
-  if (log_data.tx_enabled) ucuart_tx_schedule(log_data.uart, NULL, 0);
+  if (log_data.tx_enabled) ucuart_tx_schedule(log_data.uart);
 }
 
 size_t log_tx_avail(void) {
@@ -394,6 +394,7 @@ void log_init(uart_t* uart) {
 #endif
 
   log_data.uart = uart;
+  ucuart_set_connect_prefix(log_data.uart, device_info_tx_buf, device_info_len);
   ucuart_set_tx_cb(log_data.uart, &tx_cb);
 #if !defined(CONFIG_UC_LOG_SERVER)
   // If there is no server then assume we can send at all times after init
