@@ -1,0 +1,9 @@
+description: |
+  ucLogger over Network
+
+  This is the binding for the ucLog driver using Network TCP sockets.
+  This driver protocol matches needs of Unit Circle Logging Framwork.
+
+compatible: "staric,ucnet"
+
+include: [base.yaml]

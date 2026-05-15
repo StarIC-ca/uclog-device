@@ -1,0 +1,76 @@
+# © 2026 StarIC Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+config UCNET
+	bool "ucLog over Network"
+	default y
+	depends on DT_HAS_STARIC_UCNET_ENABLED
+	select NETWORKING
+	select NET_SOCKETS
+	select NET_SOCKETS_SERVICE
+	select POSIX_API
+	help
+	  ucLog over TCP Network Sockets
+
+if UCNET
+
+config UCNET_TX_WQ_STACK_SIZE
+	int "ucLog net TX workq stack size"
+	default 2048
+
+config UCNET_TX_WQ_THREAD_PRIORITY
+	int "ucLog net TX workq thread priority"
+	default 5
+
+choice UCNET_PROTOCOL
+	prompt "ucLog net protocol to use"
+	default UCNET_PROTOCOL_TCP
+	help
+	  Select the network protocol to use (TCP/UDP)
+
+config UCNET_PROTOCOL_TCP
+	bool "Use TCP"
+	select NET_TCP
+
+config UCNET_PROTOCOL_UDP
+	bool "Use UDP"
+	select NET_UDP
+
+endchoice
+
+config UCNET_MDNS
+	bool "Advertise ucLog service over mDNS"
+	default n
+	select MDNS_RESPONDER
+	select DNS_SD
+	select MDNS_RESPONDER_DNS_SD
+
+if UCNET_MDNS
+
+configdefault ZVFS_POLL_MAX
+	default 5
+
+configdefault NET_MAX_CONN
+	default 8
+
+configdefault NET_MAX_CONTEXTS
+	default 8
+
+endif
+
+module = UCNET
+module-str = ucnet
+source "subsys/logging/Kconfig.template.log_config"
+
+config UCNET_INIT_PRIORITY
+	int "ucnet init priority"
+	default 95
+	help
+	  ucLog driver initialization priority.
+	  This must be higher than NET_INIT_PRIO, so network services (like socket service)
+	  are initialized first
+
+# Can include specific alternatives here e.g.
+# rsource Kconfig.xxx
+
+endif
