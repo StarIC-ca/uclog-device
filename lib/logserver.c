@@ -278,7 +278,7 @@ static int z_log_server_init(void) {
                         CONFIG_UC_LOG_STACK_SIZE,
                         (k_thread_entry_t)log_thread,
                         &server, NULL, NULL,
-                        K_PRIO_COOP(CONFIG_UC_LOG_THREAD_PRIORITY),
+                        CONFIG_UC_LOG_THREAD_PRIORITY,
                         0, K_NO_WAIT);
   if (k_thread_name_set(tid, "Log") != 0) {
       // Couldn't set thread name
