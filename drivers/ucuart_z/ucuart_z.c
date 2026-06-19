@@ -361,6 +361,13 @@ static int panic(const struct device *dev)
     return 0;
 }
 
+static int is_host_ready(const struct device* dev, bool* ready) {
+    struct ucuart_data *data = ZEPHYR_DEVICE_MEMBER(dev, data);
+
+    *ready = (atomic_get(&data->host_ready) == true);
+    return 0;
+}
+
 static const struct ucuart_driver_api ucuart_api = {
     .tx_no_wait = tx,
     .tx_buffer = tx_buffer,
@@ -374,6 +381,7 @@ static const struct ucuart_driver_api ucuart_api = {
     .rx_skip = rx_skip,
     .wait_event = wait_event,
     .panic = panic,
+    .is_host_ready = is_host_ready,
 };
 
 static void ping_timeout(struct k_timer *timer)

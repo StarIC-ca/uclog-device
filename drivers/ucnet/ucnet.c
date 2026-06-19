@@ -322,6 +322,13 @@ static int panic(const struct device *dev)
     return 0;
 }
 
+static int is_host_ready(const struct device* dev, bool* ready) {
+    struct ucnet_data *data = ZEPHYR_DEVICE_MEMBER(dev, data);
+
+    *ready = (atomic_get(&data->connect_state) == CONNECTED);
+    return 0;
+}
+
 static const struct ucuart_driver_api ucnet_api = {
     .tx_no_wait = tx,
     .tx_buffer = tx_buffer,
@@ -335,6 +342,7 @@ static const struct ucuart_driver_api ucnet_api = {
     .rx_skip = rx_skip,
     .wait_event = wait_event,
     .panic = panic,
+    .is_host_ready = is_host_ready,
 };
 
 #if defined(CONFIG_UCNET_PROTOCOL_UDP)
