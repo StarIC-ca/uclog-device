@@ -295,6 +295,10 @@ size_t log_tx_avail(void) {
   return cb_write_avail(&tx_cb);
 }
 
+size_t log_tx_read_avail(void) {
+  return cb_read_avail(&tx_cb);
+}
+
 #define LOG_APP_HASH_SIZE 64
 const uint8_t* log_app_hash(size_t* n) {
 #ifdef CONFIG_UC_SIGNED_IMAGE

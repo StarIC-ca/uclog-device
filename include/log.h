@@ -233,6 +233,7 @@ __attribute__((noreturn)) void log_fatal_(void);
 
 void log_tx(uint8_t port, const uint8_t* data, size_t n);
 size_t log_tx_avail(void);
+size_t log_tx_read_avail(void);
 
 void log_tx_suspend(void);
 void log_tx_resume(void);

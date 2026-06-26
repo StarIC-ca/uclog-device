@@ -51,6 +51,8 @@ LOG_MODULE_REGISTER(ucnet);
 DNS_SD_REGISTER_TCP_SERVICE(uclog, CONFIG_NET_HOSTNAME, "_uclog", "local", service_txt, NET_PORT);
 #elif defined(CONFIG_UCNET_PROTOCOL_UDP)
 DNS_SD_REGISTER_UDP_SERVICE(uclog, CONFIG_NET_HOSTNAME, "_uclog", "local", service_txt, NET_PORT);
+
+#define MAX_UDP_DATAGRAM_LEN 1400
 #endif
 #endif
 
@@ -129,62 +131,61 @@ static void connection_closed(int client)
 
 static ssize_t sendall(int sock, const void *buf, size_t len)
 {
-	while (len) {
-		ssize_t out_len = send(sock, buf, len, 0);
+    while (len) {
+#if defined(CONFIG_UCNET_PROTOCOL_TCP)
+        ssize_t out_len = send(sock, buf, len, 0);
+#elif defined(CONFIG_UCNET_PROTOCOL_UDP)
+        size_t dgram_len = (len > MAX_UDP_DATAGRAM_LEN) ? MAX_UDP_DATAGRAM_LEN : len;
+        ssize_t out_len = sendto(sock, buf, dgram_len, 0,
+                    (struct sockaddr *)&udp_addr, sizeof(udp_addr));
+#endif
+        if (out_len < 0) {
+            return out_len;
+        }
 
-		if (out_len < 0) {
-			return out_len;
-		}
+        buf = (const char *)buf + out_len;
+        len -= out_len;
+    }
 
-		buf = (const char *)buf + out_len;
-		len -= out_len;
-	}
-
-	return 0;
+    return 0;
 }
 
 static void ucnet_send(struct k_work *item)
 {
     while (data.tx_cb && atomic_get(&data.connect_state) == CONNECTED) {
         size_t n = cb_peek_avail(data.tx_cb);
+#if defined(CONFIG_UCNET_PROTOCOL_TCP)
+        int sock = client_socket_fd.fd;
+#elif defined(CONFIG_UCNET_PROTOCOL_UDP)
+        int sock = udp_socket_fd.fd;
+#endif
         if (data.prefix_len > data.prefix_index) {
             // Send prefix first
             n = data.prefix_len - data.prefix_index;
-#if defined(CONFIG_UCNET_PROTOCOL_TCP)
-            int n_sent = sendall(client_socket_fd.fd, &data.prefix_buf[data.prefix_index], n);
+            int n_sent = sendall(sock, &data.prefix_buf[data.prefix_index], n);
             if (n_sent == 0) {
                 n_sent = n;
             }
-#elif defined(CONFIG_UCNET_PROTOCOL_UDP)
-            int n_sent = sendto(udp_socket_fd.fd, &data.prefix_buf[data.prefix_index], n, 0,
-                    (struct sockaddr *)&udp_addr, sizeof(udp_addr));
-#endif
-
             if (n_sent < 0) {
                 LOG_ERR("send: %d", -errno);
 #if defined(CONFIG_UCNET_PROTOCOL_TCP)
                 LOG_ERR("Closing connection");
-                connection_closed(client_socket_fd.fd);
+                connection_closed(sock);
 #endif
                 return;
             } else if (n_sent > 0) {
                 data.prefix_index += n_sent;
             }
         } else if (n > 0) {
-#if defined(CONFIG_UCNET_PROTOCOL_TCP)
-            int n_sent = sendall(client_socket_fd.fd, cb_peek(data.tx_cb), n);
+            int n_sent = sendall(sock, cb_peek(data.tx_cb), n);
             if (n_sent == 0) {
                 n_sent = n;
             }
-#elif defined(CONFIG_UCNET_PROTOCOL_UDP)
-            int n_sent = sendto(udp_socket_fd.fd, cb_peek(data.tx_cb), n, 0,
-                    (struct sockaddr *)&udp_addr, sizeof(udp_addr));
-#endif
             if (n_sent < 0) {
                 LOG_ERR("send: %d", -errno);
 #if defined(CONFIG_UCNET_PROTOCOL_TCP)
                 LOG_ERR("Closing connection");
-                connection_closed(client_socket_fd.fd);
+                connection_closed(sock);
 #endif
                 return;
 
@@ -322,7 +323,8 @@ static int panic(const struct device *dev)
     return 0;
 }
 
-static int is_host_ready(const struct device* dev, bool* ready) {
+static int is_host_ready(const struct device *dev, bool *ready)
+{
     struct ucnet_data *data = ZEPHYR_DEVICE_MEMBER(dev, data);
 
     *ready = (atomic_get(&data->connect_state) == CONNECTED);

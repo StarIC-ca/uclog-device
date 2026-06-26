@@ -5,6 +5,7 @@ config UCUART_Z
 	bool "ucLog UART (Zephyr API)"
 	default y
 	depends on DT_HAS_STARIC_UCUART_Z_ENABLED
+	depends on UC_LOG
 	select UART
 	select SERIAL
 	select UART_ASYNC_API if SERIAL_SUPPORT_ASYNC
