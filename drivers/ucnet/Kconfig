@@ -5,6 +5,7 @@ config UCNET
 	bool "ucLog over Network"
 	default y
 	depends on DT_HAS_STARIC_UCNET_ENABLED
+	depends on UC_LOG
 	select NETWORKING
 	select NET_SOCKETS
 	select NET_SOCKETS_SERVICE
