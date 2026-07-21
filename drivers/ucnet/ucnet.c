@@ -390,6 +390,7 @@ static int receive_data(struct net_socket_service_event *pev, char *buf, size_t 
 
         if (atomic_get(&data.connect_state) == WAITING_FOR_CONNECT) {
             udp_addr = addr;
+            inet_ntop(addr.sin_family, &addr.sin_addr, addr_str, sizeof(addr_str));
             LOG_INF("New data from %s", addr_str);
             atomic_set(&data.connect_state, CONNECTED);
         }

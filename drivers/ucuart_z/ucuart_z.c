@@ -27,6 +27,8 @@
 #define RX_TEMP_BUF_LEN (256)
 #define NUM_RX_BUFS     (3)
 
+#define UART_TIMEOUT_US SYS_FOREVER_US
+
 // uclog sends ping packets at this rate
 #define UCLOG_PING_RATE_MS 500
 // ping_timeout_timer will expire if no packets received in this time
@@ -57,6 +59,9 @@ struct ucuart_data {
     uint8_t ppi;
     struct gpio_callback wakeup_gpio_cb;
     struct k_work_delayable wakeup_work;
+    struct k_work tx_work;
+    K_KERNEL_STACK_MEMBER(stack_area, CONFIG_UCUART_Z_TX_WQ_STACK_SIZE);
+    struct k_work_q work_q;
 };
 
 typedef enum {
@@ -88,17 +93,12 @@ static void uart_event_handler(const struct device *dev, struct uart_event *evt,
         } else {
             cb_skip(data->tx_cb, evt->data.tx.len);
         }
+        atomic_set(&data->tx_active, false);
 
-        // If there is more data then send it now
+        // If there is more data then trigger a send
         size_t n = cb_peek_avail(data->tx_cb);
         if (n > 0 && atomic_get(&data->host_ready)) {
-            int ret = uart_tx(dev, cb_peek(data->tx_cb), n, SYS_FOREVER_US);
-            if (ret != 0) {
-                LOG_ERROR("uart_tx() failed, ret %d", ret);
-                atomic_set(&data->tx_active, false);
-            }
-        } else {
-            atomic_set(&data->tx_active, false);
+            k_work_submit_to_queue(&data->work_q, &data->tx_work);
         }
         break;
     }
@@ -208,10 +208,12 @@ static void uart_isr(const struct device *uart_dev, void *user_data)
 }
 #endif
 
-static int tx_schedule(const struct device *dev)
+static void tx_work(struct k_work *item)
 {
+    struct ucuart_data *data = CONTAINER_OF(item, struct ucuart_data, tx_work);
+
+    const struct device *dev = data->dev;
     const struct ucuart_config *config = ZEPHYR_DEVICE_MEMBER(dev, config);
-    struct ucuart_data *data = ZEPHYR_DEVICE_MEMBER(dev, data);
 
     // LOG_INFO("ucuart_tx_schedule %d %p", data->tx_active, data->tx_cb);
 
@@ -223,13 +225,13 @@ static int tx_schedule(const struct device *dev)
             if (data->prefix_len > data->prefix_index) {
                 // Send prefix first
                 n = data->prefix_len - data->prefix_index;
-                int ret = uart_tx(config->uart, &data->prefix_buf[data->prefix_index], n, SYS_FOREVER_US);
+                int ret = uart_tx(config->uart, &data->prefix_buf[data->prefix_index], n, UART_TIMEOUT_US);
                 if (ret != 0) {
                     LOG_ERROR("uart_tx() failed, ret %d", ret);
                     atomic_set(&data->tx_active, false);
                 }
             } else if (n > 0) {
-                int ret = uart_tx(config->uart, cb_peek(data->tx_cb), n, SYS_FOREVER_US);
+                int ret = uart_tx(config->uart, cb_peek(data->tx_cb), n, UART_TIMEOUT_US);
                 if (ret != 0) {
                     LOG_ERROR("uart_tx() failed, ret %d", ret);
                     atomic_set(&data->tx_active, false);
@@ -246,6 +248,15 @@ static int tx_schedule(const struct device *dev)
             }
 #endif
         }
+    }
+}
+
+static int tx_schedule(const struct device *dev)
+{
+    struct ucuart_data *data = ZEPHYR_DEVICE_MEMBER(dev, data);
+
+    if (data->tx_cb && atomic_get(&data->host_ready)) {
+        k_work_submit_to_queue(&data->work_q, &data->tx_work);
         return 0;
     } else {
         return -ENOTCONN;
@@ -536,6 +547,15 @@ static int ucuart_init(const struct device *dev)
     k_event_init(&data->event);
     k_timer_init(&data->ping_timeout_timer, ping_timeout, NULL);
 
+    k_work_init(&data->tx_work, tx_work);
+
+    k_work_queue_init(&data->work_q);
+    k_work_queue_start(&data->work_q, data->stack_area, K_THREAD_STACK_SIZEOF(data->stack_area),
+            CONFIG_UCUART_Z_TX_WQ_THREAD_PRIORITY, NULL);
+    if (k_thread_name_set(&data->work_q.thread, "UCUART TX WQ") != 0) {
+        // Couldn't set thread name
+    }
+
     // Configure UART
     struct uart_config uart_cfg = {.baudrate = config->current_speed,
         .parity = UART_CFG_PARITY_NONE,
@@ -642,7 +662,7 @@ static int ucuart_init(const struct device *dev)
     PM_DEVICE_DT_INST_DEFINE(i, uart_pm_action);                                                   \
                                                                                                    \
     DEVICE_DT_INST_DEFINE(i, ucuart_init, PM_DEVICE_DT_INST_GET(i), &data##i, &config##i,          \
-            PRE_KERNEL_1, CONFIG_UCUART_Z_INIT_PRIORITY, &ucuart_api);
+            POST_KERNEL, CONFIG_UCUART_Z_INIT_PRIORITY, &ucuart_api);
 
 /* clang-format on */
 

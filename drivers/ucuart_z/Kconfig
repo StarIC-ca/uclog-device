@@ -17,6 +17,14 @@ config UCUART_Z
 
 if UCUART_Z
 
+config UCUART_Z_TX_WQ_STACK_SIZE
+	int "ucLog UART TX workq stack size"
+	default 2048
+
+config UCUART_Z_TX_WQ_THREAD_PRIORITY
+	int "ucLog UART TX workq thread priority"
+	default 5
+
 module = UCUART_Z
 module-str = ucuart_Z
 source "subsys/logging/Kconfig.template.log_config"
