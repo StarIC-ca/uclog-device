@@ -47,7 +47,7 @@ struct ucuart_data {
     uint8_t *rx_temp_buf;
     size_t rx_temp_buf_index;
 #endif
-    uint8_t prefix_buf[RX_TEMP_BUF_LEN];
+    uint8_t *prefix_buf;
     size_t prefix_index;
     size_t prefix_len;
     const struct device *dev;
@@ -257,7 +257,7 @@ static int set_connect_prefix(const struct device *dev, const uint8_t *prefix, s
     struct ucuart_data *data = ZEPHYR_DEVICE_MEMBER(dev, data);
 
     if ((prefix != NULL) && (pn > 0)) {
-        if (pn > sizeof(data->prefix_buf)) {
+        if (pn > RX_TEMP_BUF_LEN) {
             LOG_ERROR("Prefix too long: %zu", pn);
             data->prefix_index = 0;
             data->prefix_len = 0;
@@ -618,6 +618,8 @@ static int ucuart_init(const struct device *dev)
     static uint8_t ucuart_rx_buf##i[RX_CB_BUF_LEN];                                                \
     static cb_t ucuart_rx_cb##i = CB_INIT(ucuart_rx_buf##i);                                       \
                                                                                                    \
+    static uint8_t ucuart_prefix_buf##i[RX_TEMP_BUF_LEN] NOCACHE_ATTR;                             \
+                                                                                                   \
     UART_TEMP_BUF_INIT();                                                                          \
                                                                                                    \
     static const struct ucuart_config config##i = {                                                \
@@ -633,6 +635,7 @@ static int ucuart_init(const struct device *dev)
         .tx_cb = NULL,                                                                             \
         .prefix_index = 0U,                                                                        \
         .prefix_len = 0U,                                                                          \
+        .prefix_buf = ucuart_prefix_buf##i,                                                        \
         UART_ASYNC_DATA_INIT()                                                                     \
     };                                                                                             \
                                                                                                    \
