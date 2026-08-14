@@ -26,4 +26,4 @@ case $(uname) in
 esac
 
 # Signing details
-export SBL_NEB_CERT=secondary.cert
+export SBL_CERT=secondary.cert

@@ -282,8 +282,11 @@ def dump_splits(name, pk, splits, export_prefix):
 def load_split_file(p, pp=None):
     if os.path.isfile(p):
         with open(p, "rt") as f:
-            x_split = f.read().strip()
-            x, split = x_split.split(":")
+            x_split = f.read().strip().split(":")
+            if len(x_split) == 2:
+                x, split = x_split
+            elif len(x_split) == 3:
+                x, split, pp = x_split
             if pp is None:
                 pp = getpass.getpass(f"passphrase {x}: ")
             return ":".join([x, split, pp])
@@ -317,7 +320,7 @@ def load_split(key):
         else:
             # file provided
             split = load_split_file(key)
-    except Exception:
+    except Exception as e:
         print(f"error: unable load key split {key}")
         exit(1)
     return split

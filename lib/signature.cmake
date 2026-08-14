@@ -35,16 +35,44 @@ function(zephyr_sbl_tasks)
     )
   endif()
 
+  set(keyfile "${CONFIG_UC_SIGNATURE_KEY_FILE}")
+  set(certfile "${CONFIG_UC_SIGNATURE_CERT_FILE}")
+
+  if("${keyfile}" STREQUAL "")
+    # No signature key file
+    message(FATAL_ERROR "No signature key file provided. Set CONFIG_UC_SIGNATURE_KEY_FILE to correct path to key file")
+  endif()
+
+  if("${certfile}" STREQUAL "")
+    # No cert file
+    message(FATAL_ERROR "No certificate file provided. Set CONFIG_UC_SIGNATURE_CERT_FILE to correct path to certificate file")
+  endif()
+
+  foreach(file keyfile certfile)
+    if(NOT "${${file}}" STREQUAL "")
+      if(NOT IS_ABSOLUTE "${${file}}")
+        # Relative paths are relative to 'west topdir'.
+        set(${file} "${WEST_TOPDIR}/${${file}}")
+      endif()
+
+      if(NOT EXISTS "${${file}}")
+        message(FATAL_ERROR "uc sign can't find file ${${file}} (Note: Relative paths are relative to the west workspace topdir \"${WEST_TOPDIR}\")")
+      elseif(NOT (CONFIG_BUILD_OUTPUT_BIN OR CONFIG_BUILD_OUTPUT_HEX))
+        message(FATAL_ERROR "Can't sign images: Neither CONFIG_BUILD_OUTPUT_BIN nor CONFIG_BUILD_OUTPUT_HEX is enabled, so there's nothing to sign.")
+      endif()
+    endif()
+  endforeach()
+
   # CMake guarantees that multiple COMMANDs given to
   # add_custom_command() are run in order, so adding the 'west sign'
   # calls to the "extra_post_build_commands" property ensures they run
   # after the commands which generate the unsigned versions.
   set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
-    echo "Signing ${output}.elf CERT $ENV{SBL_NEB_CERT}")
+    echo "Signing ${output} CERT ${certfile}")
   set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
-    ${UCLOG_ROOT_DIR}/scripts/sbl.py sign --key $ENV{SBL_NEB} --code ${output}.hex --cert ${UCLOG_ROOT_DIR}/$ENV{SBL_NEB_CERT} ${output}.signed.hex)
+    ${UCLOG_ROOT_DIR}/scripts/sbl.py sign --key "${keyfile}" --code ${output}.hex --cert "${certfile}" ${output}.signed.hex)
   set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
-    ${UCLOG_ROOT_DIR}/scripts/sbl.py sign --key $ENV{SBL_NEB} --code ${output}.bin --cert ${UCLOG_ROOT_DIR}/$ENV{SBL_NEB_CERT} ${output}.signed.bin)
+    ${UCLOG_ROOT_DIR}/scripts/sbl.py sign --key "${keyfile}" --code ${output}.bin --cert "${certfile}" ${output}.signed.bin)
   set_property(GLOBAL APPEND PROPERTY extra_post_build_byproducts ${byproducts})
 endfunction()
 

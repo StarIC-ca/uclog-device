@@ -80,5 +80,17 @@ config UC_SIGNED_IMAGE
         bool "Enable support for UC signed images"
         default n
 
+if UC_SIGNED_IMAGE
+
+config UC_SIGNATURE_KEY_FILE
+        string "Path to the signing key file"
+        default ""
+
+config UC_SIGNATURE_CERT_FILE
+        string "Path to the certificate file"
+        default ""
+
+endif
+
 endmenu
 

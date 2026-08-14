@@ -26,6 +26,10 @@
 #include "app_version.h"
 #endif
 
+#ifdef CONFIG_UC_SIGNED_IMAGE
+#include "sbl.h"
+#endif
+
 #if CONFIG_UC_LOG_SAVE
 #define NOCLEAR __noinit
 #else
@@ -206,10 +210,6 @@ static void fill_device_info(void)
 
     cbor_stream_t cbor_stream;
     cbor_init(&cbor_stream, cbor_output, MAX_DEVICE_INFO_SIZE);
-
-#ifdef CONFIG_SIGNED_IMAGE
-    const uint8_t *app_hash__ = sbl_app_hash();
-#endif
 
     cbor_error_t err = cbor_pack(&cbor_stream,
             "{"
