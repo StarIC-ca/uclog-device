@@ -35,14 +35,18 @@ function(zephyr_sbl_tasks)
     )
   endif()
 
-  set(keyfile "${CONFIG_UC_SIGNATURE_KEY_FILE}")
-  set(certfile "${CONFIG_UC_SIGNATURE_CERT_FILE}")
-
-  if("${keyfile}" STREQUAL "")
-    # No signature key file
-    message(FATAL_ERROR "No signature key file provided. Set CONFIG_UC_SIGNATURE_KEY_FILE to correct path to key file")
+  if(DEFINED ENV{UC_SIGNATURE_KEY})
+    set(keyarg $ENV{UC_SIGNATURE_KEY})
+    set(keyfile "")
+  else()
+    set(keyfile "${CONFIG_UC_SIGNATURE_KEY_FILE}")
+    if("${keyfile}" STREQUAL "")
+      # No signature key file
+      message(FATAL_ERROR "No signature key file provided. Set CONFIG_UC_SIGNATURE_KEY_FILE to correct path to key file")
+    endif()
   endif()
 
+  set(certfile "${CONFIG_UC_SIGNATURE_CERT_FILE}")
   if("${certfile}" STREQUAL "")
     # No cert file
     message(FATAL_ERROR "No certificate file provided. Set CONFIG_UC_SIGNATURE_CERT_FILE to correct path to certificate file")
@@ -63,6 +67,10 @@ function(zephyr_sbl_tasks)
     endif()
   endforeach()
 
+  if(NOT "${keyfile}" STREQUAL "")
+    set(keyarg ${keyfile})
+  endif()
+
   # CMake guarantees that multiple COMMANDs given to
   # add_custom_command() are run in order, so adding the 'west sign'
   # calls to the "extra_post_build_commands" property ensures they run
@@ -70,9 +78,9 @@ function(zephyr_sbl_tasks)
   set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
     echo "Signing ${output} CERT ${certfile}")
   set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
-    ${UCLOG_ROOT_DIR}/scripts/sbl.py sign --key "${keyfile}" --code ${output}.hex --cert "${certfile}" ${output}.signed.hex)
+    ${UCLOG_ROOT_DIR}/scripts/sbl.py sign --key "${keyarg}" --code ${output}.hex --cert "${certfile}" ${output}.signed.hex)
   set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
-    ${UCLOG_ROOT_DIR}/scripts/sbl.py sign --key "${keyfile}" --code ${output}.bin --cert "${certfile}" ${output}.signed.bin)
+    ${UCLOG_ROOT_DIR}/scripts/sbl.py sign --key "${keyarg}" --code ${output}.bin --cert "${certfile}" ${output}.signed.bin)
   set_property(GLOBAL APPEND PROPERTY extra_post_build_byproducts ${byproducts})
 endfunction()
 
