@@ -46,7 +46,11 @@ function(zephyr_sbl_tasks)
     endif()
   endif()
 
-  set(certfile "${CONFIG_UC_SIGNATURE_CERT_FILE}")
+  if(DEFINED ENV{UC_SIGNATURE_CERT})
+    set(certfile $ENV{UC_SIGNATURE_CERT})
+  else()
+    set(certfile "${CONFIG_UC_SIGNATURE_CERT_FILE}")
+  endif()
   if("${certfile}" STREQUAL "")
     # No cert file
     message(FATAL_ERROR "No certificate file provided. Set CONFIG_UC_SIGNATURE_CERT_FILE to correct path to certificate file")
