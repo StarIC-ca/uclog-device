@@ -102,16 +102,12 @@ class Item(object):
         return f"Item({self.tag}, {len(self.attr)}, {len(self.children)})"
 
 
-def parse(filename):
+def parse(filename, objdump_cmd):
     debug = False
     items = {}  # map from addr->Item
     stack = [{"level": -1, "item": Item("root")}]
 
-    if shutil.which("arm-zephyr-eabi-objdump"):
-        gcc_os = "zephyr"
-    else:
-        gcc_os = "none"
-    cmd = [f"arm-{gcc_os}-eabi-objdump", "-Wi", "-g", filename]
+    cmd = [objdump_cmd, "-Wi", "-g", filename]
     proc = Popen(cmd, stdout=PIPE)  # nosec
     if True:
         for lineno, line in enumerate(proc.stdout.readlines()):
@@ -626,7 +622,9 @@ def load_cbor_from_elf(filename):
 
 
 class LogData(object):
-    def __init__(self, filename, verbose=False):
+    def __init__(self, filename, objdump_cmd="arm-none-eabi-objdump", verbose=False):
+        self.filename = filename
+        self.objdump_cmd = objdump_cmd
         if verbose:
             print(f"Loading {filename}")
         if filename.endswith(".cbor"):
@@ -653,10 +651,9 @@ class LogData(object):
                 ) = load_from_cbor(data)
             else:
                 self.enums, self.tdenums, self.variables, self.functions = extract(
-                    *parse(filename)
+                    *parse(filename, objdump_cmd)
                 )
                 self.saddr, self.fmts = load_logdata(filename)
-        self.filename = filename
         self.ts = os.stat(filename).st_mtime
         self.count = 0
         self.start_time = time.time()
@@ -673,7 +670,7 @@ class LogData(object):
         if ts != self.ts:
             old_target = self.target()
             self.enums, self.tdenums, self.variables, self.functions = extract(
-                *parse(self.filename)
+                *parse(self.filename, self.objdump_cmd)
             )
             self.saddr, self.fmts = load_logdata(self.filename)
             self.ts = ts
@@ -775,9 +772,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser("Dump ELF log data")
     parser.add_argument("file", help="ELF file to process")
     parser.add_argument("--ofile", help="Output File of preprocessed data")
+    parser.add_argument("--objdump", help="Objdump command", default="arm-none-eabi-objdump")
     parser.add_argument("--dump", action="store_true", help="Dump data")
     args = parser.parse_args()
-    d = LogData(args.file)
+    d = LogData(args.file, args.objdump)
     if args.dump:
         d.dump_fmts()
         d.dump()

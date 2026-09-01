@@ -21,7 +21,7 @@ function(zephyr_log_tasks)
   set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
     echo "Build logdata ${output}.logdata")
   set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
-    ${UCLOG_ROOT_DIR}/scripts/logdata.py --ofile ${output}.logdata ${output}.elf)
+    ${UCLOG_ROOT_DIR}/scripts/logdata.py --ofile ${output}.logdata --objdump ${CMAKE_OBJDUMP} ${output}.elf)
   set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
     echo "Add logdata to ${output}.elf")
   set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
