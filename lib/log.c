@@ -282,12 +282,21 @@ void log_tx(uint8_t port, const uint8_t* data, size_t n) {
 
   if (n > LOG_MAX_PACKET_SIZE) LOG_FATAL("tx message too long %zu", n);
   if (port >= LOG_MAX_PORTS) LOG_FATAL("invalid port %d", port);
+
+  // Prevent thread scheduling while data is encoded into static staging buffer
+  // log_tx is not to be called in ISR,
+  // and will cause an ASSERT in k_sched_lock (if CONFIG_ASSERT)
+  k_sched_lock();
+
   b[sizeof(b)-(LOG_MAX_PACKET_SIZE+1)] = (port << 2) | 3;
   memmove(b+sizeof(b)-LOG_MAX_PACKET_SIZE, data, n);
   n = cobs_enc(b+1, b+sizeof(b)-(LOG_MAX_PACKET_SIZE+1), n + 1);
   b[0] = '\0';
   b[n+1] = '\0';
   tx_buffer(b, n+2);
+
+  k_sched_unlock();
+
   if (log_data.tx_enabled) ucuart_tx_schedule(log_data.uart);
 }
 
