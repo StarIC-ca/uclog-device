@@ -338,6 +338,10 @@ const uint8_t* log_saved_app_hash(size_t* n) {
   return saved_app_hash;
 }
 
+void log_tx_saved_log(void) {
+  tx_buffer(saved_log, saved_log_n);
+}
+
 // app_hash__ and app_hash will only be different on a code change.
 // We don't want previous log details for code changes.
 static bool log_valid(void) {
