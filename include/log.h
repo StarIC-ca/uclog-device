@@ -231,6 +231,8 @@ void log_mem_(const char *prefix,  const void* b, size_t n);
 void log_panic_(void);
 __attribute__((noreturn)) void log_fatal_(void);
 
+void log_tx_raw(const uint8_t* b, size_t n);
+
 void log_tx(uint8_t port, const uint8_t* data, size_t n);
 size_t log_tx_avail(void);
 size_t log_tx_read_avail(void);
@@ -252,7 +254,6 @@ const uint8_t* log_app_hash(size_t* n);
 #if CONFIG_UC_LOG_SAVE
 const uint8_t* log_saved_log(size_t* n);
 const uint8_t* log_saved_app_hash(size_t* n);
-void log_tx_saved_log(void);
 #endif
 
 

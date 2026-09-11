@@ -75,8 +75,6 @@ void log_panic_(void) {
   }
 }
 
-static void tx_buffer(const uint8_t* b, size_t n);
-
 void log_log1_(const char *prefix) {
   union {
     const void* p;
@@ -90,7 +88,7 @@ void log_log1_(const char *prefix) {
   size_t n = cobs_enc(b+1, b+2, 4); // inplace
   b[0] = 0x00;
   b[1+n] = 0x00;
-  tx_buffer(b, n+2);
+  log_tx_raw(b, n+2);
   if (log_data.tx_enabled) ucuart_tx_schedule(log_data.uart);
 }
 
@@ -165,7 +163,7 @@ done:
   n = cobs_enc(b+1, b+1+1, sizeof(b) -2 - 1 - n); // inplace
   b[0] = 0x00;
   b[1+n] = 0x00;
-  tx_buffer(b, n+2);
+  log_tx_raw(b, n+2);
   if (log_data.tx_enabled) ucuart_tx_schedule(log_data.uart);
 }
 
@@ -187,7 +185,7 @@ void log_mem_(const char *prefix, const void* b, size_t n) {
   n = cobs_enc(bb+1, bb+2, 8+n); // inplace
   bb[0] = 0x00;
   bb[1+n] = 0x00;
-  tx_buffer(bb, n+2);
+  log_tx_raw(bb, n+2);
   if (log_data.tx_enabled) ucuart_tx_schedule(log_data.uart);
 }
 
@@ -271,7 +269,7 @@ __attribute__((noreturn)) void log_fatal_(void) {
   NVIC_SystemReset();
 }
 
-static void tx_buffer(const uint8_t* b, size_t n) {
+void log_tx_raw(const uint8_t* b, size_t n) {
   uint32_t key = irq_lock();
   cb_write(&tx_cb, b, n);
   irq_unlock(key);
@@ -293,7 +291,7 @@ void log_tx(uint8_t port, const uint8_t* data, size_t n) {
   n = cobs_enc(b+1, b+sizeof(b)-(LOG_MAX_PACKET_SIZE+1), n + 1);
   b[0] = '\0';
   b[n+1] = '\0';
-  tx_buffer(b, n+2);
+  log_tx_raw(b, n+2);
 
   k_sched_unlock();
 
@@ -326,7 +324,7 @@ static NOCLEAR uint8_t app_hash[LOG_APP_HASH_SIZE];
 
 static uint8_t saved_app_hash[LOG_APP_HASH_SIZE];
 static uint8_t saved_log[CONFIG_UC_LOG_BUF_SIZE];
-static size_t saved_log_n;
+static size_t saved_log_n = 0;
 
 const uint8_t* log_saved_log(size_t* n) {
   *n = saved_log_n;
@@ -336,10 +334,6 @@ const uint8_t* log_saved_log(size_t* n) {
 const uint8_t* log_saved_app_hash(size_t* n) {
   *n = LOG_APP_HASH_SIZE;
   return saved_app_hash;
-}
-
-void log_tx_saved_log(void) {
-  tx_buffer(saved_log, saved_log_n);
 }
 
 // app_hash__ and app_hash will only be different on a code change.
