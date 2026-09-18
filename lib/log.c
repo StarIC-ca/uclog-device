@@ -57,8 +57,15 @@ static log_data_t log_data;
 #define NOCACHE_ATTR
 #endif
 
+#if defined(CONFIG_UC_LOG_TX_ALIGN4)
+BUILD_ASSERT((CONFIG_UC_LOG_BUF_SIZE % 4) == 0, "UC_LOG_BUF_SIZE must be a multiple of 4");
+#define TX_BUF_ALIGN __aligned(32)
+#else
+#define TX_BUF_ALIGN
+#endif
+
 static NOCLEAR cb_t    tx_cb;
-static NOCLEAR uint8_t tx_buf[CONFIG_UC_LOG_BUF_SIZE] NOCACHE_ATTR;
+static NOCLEAR uint8_t tx_buf[CONFIG_UC_LOG_BUF_SIZE] NOCACHE_ATTR TX_BUF_ALIGN;
 
 #define MAX_DEVICE_INFO_SIZE 256
 static uint8_t device_info_tx_buf[COBS_ENC_SIZE(MAX_DEVICE_INFO_SIZE) + 2] NOCACHE_ATTR;
@@ -272,6 +279,12 @@ __attribute__((noreturn)) void log_fatal_(void) {
 void log_tx_raw(const uint8_t* b, size_t n) {
   uint32_t key = irq_lock();
   cb_write(&tx_cb, b, n);
+#if defined(CONFIG_UC_LOG_TX_ALIGN4)
+  // Pad to a 4 byte multiple so both ring indices stay word aligned.
+  static const uint8_t zeros[3];
+  size_t pad = (4u - (n & 3u)) & 3u;
+  if (pad > 0) cb_write(&tx_cb, zeros, pad);
+#endif
   irq_unlock(key);
 }
 

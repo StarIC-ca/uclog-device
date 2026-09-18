@@ -29,6 +29,17 @@ config UC_LOG_MAX_PACKET_SIZE
         int "UC log max packet size"
         default 1500
 
+config UC_LOG_TX_ALIGN4
+        bool "Keep the log TX buffer in 4 byte units"
+        default y
+        help
+          Word align the log TX ring buffer and pad every write into it with
+          zeros to a multiple of 4 bytes. Frames are 0x00 delimited, so the
+          host ignores the padding. Any linear run a driver takes from the
+          ring then starts on a word boundary and is a multiple of 4 long,
+          which the DMA requires on some platforms (a transfer that breaks this
+          fails silently). CONFIG_UC_LOG_BUF_SIZE must be a multiple of 4.
+
 if UC_LOG_SERVER
 
 config UC_LOG_SERVER_PORTS

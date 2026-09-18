@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+description: |
+  ucLog over USB
+
+  USB CDC ACM function carrying the ucLog protocol, on the Zephyr USB device
+  stack (device_next). It implements the ucuart API used by the ucLog library
+  rather than the Zephyr UART API, and sends straight from the ucLog TX ring
+  buffer so the USB controller can DMA it. Place the node under the USB
+  device controller node, e.g. zephyr_udc0.
+
+compatible: "staric,ucusb_z"
+
+include: base.yaml
+
+on-bus: usb

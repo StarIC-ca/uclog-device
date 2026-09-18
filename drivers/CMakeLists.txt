@@ -5,6 +5,7 @@
 zephyr_syscall_header(${UCLOG_ROOT_DIR}/include/ucuart.h)
 
 add_subdirectory_ifdef(CONFIG_UCUSB ucusb)
+add_subdirectory_ifdef(CONFIG_UCUSB_Z ucusb_z)
 add_subdirectory_ifdef(CONFIG_UCUART ucuart)
 add_subdirectory_ifdef(CONFIG_UCUART_Z ucuart_z)
 add_subdirectory_ifdef(CONFIG_UCNET ucnet)

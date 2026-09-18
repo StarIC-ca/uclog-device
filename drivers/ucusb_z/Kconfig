@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config UCUSB_Z
+    bool "ucLog over USB CDC ACM (Zephyr USB device stack)"
+    default y
+    depends on DT_HAS_STARIC_UCUSB_Z_ENABLED
+    depends on UC_LOG
+    select USB_DEVICE_STACK_NEXT
+    select EVENTS
+    help
+      ucLog transport over a USB CDC ACM function. TX data is sent straight
+      from the ucLog TX ring buffer, so with CONFIG_UDC_STM32_DMA the OTG_HS
+      core DMAs it. This needs CONFIG_UC_LOG_TX_ALIGN4 (from
+      patches/uclog-log-tx-align4.patch).
+
+if UCUSB_Z
+
+config UCUSB_Z_VID
+    hex "USB vendor ID"
+    default 0x2fe3
+	help
+	  You must use your own VID for samples and applications outside of
+	  Zephyr Project.
+
+config UCUSB_Z_PID
+    hex "USB product ID"
+    default 0x0004
+	help
+	  You must use your own PID for samples and applications outside of
+	  Zephyr Project.
+
+config UCUSB_Z_MANUFACTURER
+    string "USB manufacturer string"
+    default "Zephyr Project"
+
+config UCUSB_Z_PRODUCT
+    string "USB product string"
+    default "ucLog USB backend"
+
+config UCUSB_Z_TX_MAX_SIZE
+    int "Largest single IN transfer, in bytes"
+    default 16384
+    help
+      Upper bound on how much of the ring one IN transfer takes. Must be a
+      multiple of 512 (the high-speed bulk MPS).
+
+config UCUSB_Z_TX_WQ_STACK_SIZE
+    int "ucLog USB TX workqueue stack size"
+    default 1024
+
+config UCUSB_Z_TX_WQ_THREAD_PRIORITY
+    int "ucLog USB TX workqueue thread priority"
+    default 5
+
+config UCUSB_Z_INIT_PRIORITY
+    int "ucLog USB init priority"
+    default 95
+    help
+      Must be after the USB device stack thread (USBD_THREAD_INIT_PRIO) and
+      the UDC driver, and before ucLog attaches to the console at
+      APPLICATION level.
+
+module = UCUSB_Z
+module-str = ucusb_z
+source "subsys/logging/Kconfig.template.log_config"
+
+endif
